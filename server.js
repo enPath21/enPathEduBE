@@ -6,6 +6,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.use('/api/edu', require('./routes/ciaRoutes'));
 app.use('/api/education', require('./routes/educationRoutes'));
 app.use('/api/education', require('./routes/waypointRoutes'));
 app.use('/api/activity', require('./routes/activityRoutes'));
