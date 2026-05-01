@@ -7,15 +7,33 @@ const authMiddleware = require('../middleware/authMiddleware');
 
 const EIA_BASE_URL =
   process.env.EIA_URL || 'https://enpath-edu-agent-285173621267.us-central1.run.app';
-const INTERNAL_API_KEY =
-  process.env.INTERNAL_API_KEY ||
-  process.env.INTERNAL_API_KEY;
+const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
+if (!INTERNAL_API_KEY) {
+  console.error('FATAL: INTERNAL_API_KEY is not set');
+  process.exit(1);
+}
 
 // Helper — proxy POST to EIA
 async function proxyToEIA(path, body) {
   const url = `${EIA_BASE_URL}${path}`;
   const res = await fetch(url, {
     method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': INTERNAL_API_KEY,
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `EIA returned ${res.status}`);
+  return data;
+}
+
+// Helper — proxy PATCH to EIA
+async function patchToEIA(path, body) {
+  const url = `${EIA_BASE_URL}${path}`;
+  const res = await fetch(url, {
+    method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
       'x-api-key': INTERNAL_API_KEY,
@@ -34,7 +52,7 @@ router.get('/waypoints/:userId', async (req, res) => {
       userId: req.params.userId,
       status: { $nin: ['declined', 'replaced'] },
     }).sort({ position: 1 });
-    res.json(waypoints);
+    res.json({ waypoints: waypoints.sort((a, b) => (a.position || 0) - (b.position || 0)) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -43,32 +61,29 @@ router.get('/waypoints/:userId', async (req, res) => {
 // POST /api/education/waypoints/run/:userId — trigger EIA run
 router.post('/waypoints/run/:userId', authMiddleware, async (req, res) => {
   try {
-    const data = await proxyToEIA('/run', {
-      userId: req.params.userId,
-      ...req.body,
-    });
+    const data = await proxyToEIA(`/api/agent/run/${req.params.userId}`, { trigger: req.body?.trigger || 'manual' });
     res.json(data);
   } catch (err) {
     res.status(502).json({ error: err.message });
   }
 });
 
-// PATCH /api/education/waypoints/:id/feedback — accept or decline a waypoint
+// PATCH /api/edu/waypoints/:id/feedback — forward to EIA (which handles decline → replacement queue)
 router.patch('/waypoints/:id/feedback', authMiddleware, async (req, res) => {
   try {
-    const { status, feedback } = req.body;
+    const { status, feedback, userId } = req.body;
     if (!['accepted', 'declined'].includes(status)) {
       return res.status(400).json({ error: 'status must be accepted or declined' });
     }
-
-    const update = { status };
-    if (feedback) update.rationale = feedback;
-
-    const waypoint = await EducationWaypoint.findByIdAndUpdate(req.params.id, update, { new: true });
-    if (!waypoint) return res.status(404).json({ error: 'Waypoint not found' });
-    res.json(waypoint);
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    // Map frontend 'declined' → EIA 'decline', 'accepted' → 'accept'
+    const action = status === 'accepted' ? 'accept' : 'decline';
+    const data = await patchToEIA(`/api/agent/waypoints/${req.params.id}/feedback`, { action, note: feedback, userId });
+    res.json(data);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(502).json({ error: err.message });
   }
 });
 
@@ -102,7 +117,7 @@ router.post('/waypoints/undo-replace', authMiddleware, async (req, res) => {
 // POST /api/education/waypoints/replace-with-suggestion — proxy to EIA
 router.post('/waypoints/replace-with-suggestion', authMiddleware, async (req, res) => {
   try {
-    const data = await proxyToEIA('/replace-with-suggestion', req.body);
+    const data = await proxyToEIA('/api/agent/waypoints/replace-with-suggestion', req.body);
     res.json(data);
   } catch (err) {
     res.status(502).json({ error: err.message });
@@ -112,7 +127,22 @@ router.post('/waypoints/replace-with-suggestion', authMiddleware, async (req, re
 // POST /api/education/waypoints/regenerate-one — proxy to EIA with CIA feedback
 router.post('/waypoints/regenerate-one', authMiddleware, async (req, res) => {
   try {
-    const data = await proxyToEIA('/regenerate-one', req.body);
+    const data = await proxyToEIA('/api/agent/waypoints/regenerate-one', req.body);
+    res.json(data);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// GET /api/edu/waypoints/matches/:userId — fetch education matches from EIA
+router.get('/matches/:userId', async (req, res) => {
+  try {
+    const url = `${EIA_BASE_URL}/api/agent/education-matches/${req.params.userId}`;
+    const eiaRes = await fetch(url, {
+      headers: { 'x-api-key': INTERNAL_API_KEY },
+    });
+    const data = await eiaRes.json();
+    if (!eiaRes.ok) throw new Error(data.error || `EIA returned ${eiaRes.status}`);
     res.json(data);
   } catch (err) {
     res.status(502).json({ error: err.message });
