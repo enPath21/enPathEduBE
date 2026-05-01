@@ -9,7 +9,7 @@ const EIA_BASE_URL =
   process.env.EIA_URL || 'https://enpath-edu-agent-285173621267.us-central1.run.app';
 const INTERNAL_API_KEY =
   process.env.INTERNAL_API_KEY ||
-  'INTERNAL_API_KEY_REDACTED';
+  process.env.INTERNAL_API_KEY;
 
 // Helper — proxy POST to EIA
 async function proxyToEIA(path, body) {

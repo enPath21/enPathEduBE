@@ -1,12 +1,16 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET =
-  process.env.JWT_SECRET ||
-  'JWT_SECRET_REDACTED';
+const JWT_SECRET = process.env.JWT_SECRET;
+const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
 
-const INTERNAL_API_KEY =
-  process.env.INTERNAL_API_KEY ||
-  'INTERNAL_API_KEY_REDACTED';
+if (!JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET environment variable is not set');
+  process.exit(1);
+}
+if (!INTERNAL_API_KEY) {
+  console.error('FATAL: INTERNAL_API_KEY environment variable is not set');
+  process.exit(1);
+}
 
 function apiKeyOrAuth(req, res, next) {
   // Check for internal API key first
