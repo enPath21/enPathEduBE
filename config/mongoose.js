@@ -1,8 +1,11 @@
 const mongoose = require('mongoose');
 
-const MONGODB_URI =
-  process.env.MONGODB_URI ||
-  'mongodb+srv://REDACTED@enpathcluster0.ibzri.mongodb.net/enPathEdu';
+const MONGODB_URI = process.env.MONGODB_URI;
+
+if (!MONGODB_URI) {
+  console.error('FATAL: MONGODB_URI environment variable is not set');
+  process.exit(1);
+}
 
 mongoose
   .connect(MONGODB_URI)
