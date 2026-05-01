@@ -14,10 +14,10 @@ router.get('/history/:userId', async (req, res) => {
   }
 });
 
-// POST /api/education/history — create education item
-router.post('/history', authMiddleware, async (req, res) => {
+// POST /api/edu/history/:userId — create education item
+router.post('/history/:userId', authMiddleware, async (req, res) => {
   try {
-    const item = await EducationItem.create(req.body);
+    const item = await EducationItem.create({ ...req.body, userId: req.params.userId });
     res.status(201).json(item);
   } catch (err) {
     res.status(400).json({ error: err.message });
