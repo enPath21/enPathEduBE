@@ -39,4 +39,4 @@ const educationWaypointSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model('EducationWaypoint', educationWaypointSchema);
+module.exports = mongoose.model('EducationWaypoint', educationWaypointSchema, 'education_waypoints');
