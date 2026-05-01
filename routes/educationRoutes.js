@@ -59,7 +59,7 @@ router.post('/history/from-resume', apiKeyOrAuth, async (req, res) => {
 
     const results = [];
     for (const item of items) {
-      const filter = { userId, institution: item.institution, degree: item.degree, field: item.field };
+      const filter = { userId, institution: item.institution, credentialName: item.credentialName };
       const doc = await EducationItem.findOneAndUpdate(
         filter,
         { ...item, userId, source: 'resume' },
