@@ -61,7 +61,7 @@ router.get('/waypoints/:userId', async (req, res) => {
 // POST /api/education/waypoints/run/:userId — trigger EIA run
 router.post('/waypoints/run/:userId', authMiddleware, async (req, res) => {
   try {
-    const data = await proxyToEIA(`/api/agent/run/${req.params.userId}`, { trigger: req.body?.trigger || 'manual' });
+    const data = await proxyToEIA(`/api/agent/run/${req.params.userId}`, { trigger: req.body?.trigger || 'manual', credentialTypes: req.body?.credentialTypes || [] });
     res.json(data);
   } catch (err) {
     res.status(502).json({ error: err.message });
