@@ -93,6 +93,7 @@ router.post('/cia-preferences/:userId/goals', authMiddleware, async (req, res) =
       intent_strength: req.body.intent_strength || 'moderate',
       qualitative_weight: req.body.qualitative_weight || 'moderate',
       confidence: req.body.confidence ?? 0.8,
+      ...(req.body.metadata ? { metadata: req.body.metadata } : {}),
       source: {
         type: 'user_manual',
         agent: 'eia',
