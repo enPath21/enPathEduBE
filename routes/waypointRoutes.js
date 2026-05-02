@@ -71,7 +71,7 @@ router.post('/waypoints/run/:userId', authMiddleware, async (req, res) => {
 // PATCH /api/edu/waypoints/:id/feedback — forward to EIA (which handles decline → replacement queue)
 router.patch('/waypoints/:id/feedback', authMiddleware, async (req, res) => {
   try {
-    const { status, feedback, userId } = req.body;
+    const { status, feedback, userId, projectedYear } = req.body;
     if (!['accepted', 'declined'].includes(status)) {
       return res.status(400).json({ error: 'status must be accepted or declined' });
     }
@@ -80,7 +80,7 @@ router.patch('/waypoints/:id/feedback', authMiddleware, async (req, res) => {
     }
     // Map frontend 'declined' → EIA 'decline', 'accepted' → 'accept'
     const action = status === 'accepted' ? 'accept' : 'decline';
-    const data = await patchToEIA(`/api/agent/waypoints/${req.params.id}/feedback`, { action, note: feedback, userId });
+    const data = await patchToEIA(`/api/agent/waypoints/${req.params.id}/feedback`, { action, note: feedback, userId, projectedYear });
     res.json(data);
   } catch (err) {
     res.status(502).json({ error: err.message });
