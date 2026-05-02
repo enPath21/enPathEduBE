@@ -80,4 +80,39 @@ router.delete('/cia-preferences/:userId/goals/:goalId', authMiddleware, async (r
   }
 });
 
+// POST /api/edu/cia-preferences/:userId/goals — create a new goal
+router.post('/cia-preferences/:userId/goals', authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const headers = await ciaHeaders();
+    const now = new Date().toISOString();
+    const body = {
+      goal_text: req.body.goal_text,
+      category: req.body.category,
+      status: 'active',
+      intent_strength: req.body.intent_strength || 'moderate',
+      qualitative_weight: req.body.qualitative_weight || 'moderate',
+      confidence: req.body.confidence ?? 0.8,
+      source: {
+        type: 'user_manual',
+        agent: 'eia',
+        conversation_id: 'manual',
+        turn_id: 'manual',
+        extracted_at: now,
+      },
+    };
+    const ciaRes = await fetch(`${CIA_BASE_URL}/api/v1/preferences/${userId}/goals`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!ciaRes.ok) return res.status(ciaRes.status).json({ error: 'CIA goal create failed' });
+    return res.json(await ciaRes.json());
+  } catch (err) {
+    console.error('[edu:cia-preferences] POST error:', err.message);
+    return res.status(500).json({ error: 'Failed to create goal' });
+  }
+});
+
 module.exports = router;
