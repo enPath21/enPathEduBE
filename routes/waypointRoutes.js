@@ -71,7 +71,7 @@ router.post('/waypoints/run/:userId', authMiddleware, async (req, res) => {
 // PATCH /api/edu/waypoints/:id/feedback — forward to EIA (which handles decline → replacement queue)
 router.patch('/waypoints/:id/feedback', authMiddleware, async (req, res) => {
   try {
-    const { status, feedback, userId, projectedYear } = req.body;
+    const { status, feedback, userId } = req.body;
     if (!['accepted', 'declined'].includes(status)) {
       return res.status(400).json({ error: 'status must be accepted or declined' });
     }
@@ -80,7 +80,7 @@ router.patch('/waypoints/:id/feedback', authMiddleware, async (req, res) => {
     }
     // Map frontend 'declined' → EIA 'decline', 'accepted' → 'accept'
     const action = status === 'accepted' ? 'accept' : 'decline';
-    const data = await patchToEIA(`/api/agent/waypoints/${req.params.id}/feedback`, { action, note: feedback, userId, projectedYear });
+    const data = await patchToEIA(`/api/agent/waypoints/${req.params.id}/feedback`, { action, note: feedback, userId });
     res.json(data);
   } catch (err) {
     res.status(502).json({ error: err.message });
@@ -135,10 +135,12 @@ router.post('/waypoints/regenerate-one', authMiddleware, async (req, res) => {
 });
 
 // GET /api/edu/waypoints/matches/:userId — fetch education matches from EIA
-router.get('/matches/:userId', async (req, res) => {
+// Optional ?waypointId= to search providers for a specific waypoint
+router.get('/waypoints/matches/:userId', async (req, res) => {
   try {
     const waypointId = req.query.waypointId || '';
-    const url = `${EIA_BASE_URL}/api/agent/education-matches/${req.params.userId}${waypointId ? `?waypointId=${waypointId}` : ''}`;
+    let url = `${EIA_BASE_URL}/api/agent/education-matches/${req.params.userId}`;
+    if (waypointId) url += `?waypointId=${encodeURIComponent(waypointId)}`;
     const eiaRes = await fetch(url, {
       headers: { 'x-api-key': INTERNAL_API_KEY },
     });
