@@ -137,7 +137,8 @@ router.post('/waypoints/regenerate-one', authMiddleware, async (req, res) => {
 // GET /api/edu/waypoints/matches/:userId — fetch education matches from EIA
 router.get('/matches/:userId', async (req, res) => {
   try {
-    const url = `${EIA_BASE_URL}/api/agent/education-matches/${req.params.userId}`;
+    const waypointId = req.query.waypointId || '';
+    const url = `${EIA_BASE_URL}/api/agent/education-matches/${req.params.userId}${waypointId ? `?waypointId=${waypointId}` : ''}`;
     const eiaRes = await fetch(url, {
       headers: { 'x-api-key': INTERNAL_API_KEY },
     });

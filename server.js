@@ -9,6 +9,7 @@ app.use(express.json());
 app.use('/api/edu', require('./routes/ciaRoutes'));
 app.use('/api/edu', require('./routes/educationRoutes'));
 app.use('/api/edu', require('./routes/waypointRoutes'));
+app.use('/api/edu', require('./routes/enrolledRoutes'));
 app.use('/api/edu/share', require('./routes/shareRoutes'));
 app.use('/api/activity', require('./routes/activityRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));
