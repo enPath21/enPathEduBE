@@ -154,4 +154,31 @@ router.get('/waypoints/matches/:userId', async (req, res) => {
   }
 });
 
+// PATCH /api/edu/waypoints/:id/dates — User-editable start/end dates on an education waypoint
+router.patch('/waypoints/:id/dates', authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  const { userStartDate, userEndDate, isCompleted } = req.body;
+
+  const update = {};
+  if (userStartDate !== undefined) update.userStartDate = userStartDate;
+  if (userEndDate   !== undefined) update.userEndDate   = userEndDate;
+  if (isCompleted   !== undefined) update.isCompleted   = isCompleted;
+
+  if (Object.keys(update).length === 0) {
+    return res.status(400).json({ error: 'No date fields provided' });
+  }
+
+  try {
+    const wp = await EducationWaypoint.findByIdAndUpdate(
+      id,
+      { $set: update },
+      { new: true },
+    );
+    if (!wp) return res.status(404).json({ error: 'Waypoint not found' });
+    res.json({ success: true, waypoint: wp });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
