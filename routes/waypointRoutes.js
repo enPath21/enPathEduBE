@@ -126,6 +126,107 @@ router.post('/waypoints/replace-with-suggestion', authMiddleware, async (req, re
   }
 });
 
+// POST /api/education/waypoints/insert — insert a new EIA-generated waypoint between two accepted waypoints
+router.post('/waypoints/insert', authMiddleware, async (req, res) => {
+  const { userId, afterPosition } = req.body;
+  if (!userId || afterPosition == null) {
+    return res.status(400).json({ error: 'userId and afterPosition are required' });
+  }
+
+  try {
+    // 1. Fetch all accepted waypoints for this user
+    const allWaypoints = await EducationWaypoint.find({
+      userId,
+      status: { $nin: ['declined', 'replaced'] },
+    }).sort({ position: 1 }).lean();
+
+    const accepted = allWaypoints.filter(w => w.status === 'accepted');
+
+    // 2. Find prev and next neighbors
+    const prevWaypoint = accepted.find(w => w.position === afterPosition) || null;
+    const nextWaypoint = accepted.find(w => w.position > afterPosition) || null;
+
+    // 3. Find completed edu items (isCompleted = true, or userEndDate before next waypoint's projectedYear)
+    const completedEdu = allWaypoints.filter(w => {
+      if (w.isCompleted) return true;
+      if (w.userEndDate && nextWaypoint?.projectedYear) {
+        const parts = w.userEndDate.split('/');
+        if (parts.length === 2) {
+          const endYear = parseInt(parts[1], 10);
+          return endYear <= nextWaypoint.projectedYear;
+        }
+      }
+      return false;
+    }).map(w => ({
+      credentialName: w.credentialName,
+      institution: w.institution,
+      credentialType: w.credentialType,
+      projectedYear: w.projectedYear,
+      userEndDate: w.userEndDate,
+    }));
+
+    // 4. Fetch CIA context — fails gracefully
+    let ciaGoals = [];
+    try {
+      const CIA_BASE_URL = process.env.CIA_URL || 'https://enpath-cia-285173621267.us-central1.run.app';
+      const idTokenRes = await fetch(
+        `http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${encodeURIComponent(CIA_BASE_URL)}`,
+        { headers: { 'Metadata-Flavor': 'Google' }, signal: AbortSignal.timeout(3000) }
+      ).catch(() => null);
+      const idToken = idTokenRes?.ok ? (await idTokenRes.text()).trim() : null;
+      const ciaRes = await fetch(
+        `${CIA_BASE_URL}/api/v1/context/${userId}?module=education`,
+        {
+          headers: {
+            'x-api-key': INTERNAL_API_KEY,
+            ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+          },
+          signal: AbortSignal.timeout(8000),
+        }
+      );
+      if (ciaRes.ok) {
+        const ciaData = await ciaRes.json();
+        const eduCategories = ['education', 'certification', 'training', 'skills', 'growth'];
+        ciaGoals = (ciaData.goals || []).filter(g =>
+          g.status === 'active' && eduCategories.includes(g.category)
+        );
+      }
+    } catch (ciaErr) {
+      console.warn('[edu:insert] CIA fetch failed, continuing without goals:', ciaErr.message);
+    }
+
+    // 5. Call EIA insert-waypoint
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45000);
+    let eiaData;
+    try {
+      const eiaRes = await fetch(`${EIA_BASE_URL}/api/agent/insert-waypoint`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': INTERNAL_API_KEY },
+        body: JSON.stringify({
+          userId,
+          afterPosition,
+          prevWaypoint: prevWaypoint || null,
+          nextWaypoint: nextWaypoint || null,
+          ciaGoals,
+          completedEdu,
+          allAcceptedWaypoints: accepted,
+        }),
+        signal: controller.signal,
+      });
+      eiaData = await eiaRes.json();
+      if (!eiaRes.ok) throw new Error(eiaData.error || `EIA returned ${eiaRes.status}`);
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    return res.json(eiaData);
+  } catch (err) {
+    console.error('[edu:insert] error:', err.message);
+    return res.status(err.name === 'AbortError' ? 504 : 502).json({ error: err.message || 'Insert waypoint failed' });
+  }
+});
+
 // POST /api/education/waypoints/regenerate-one — proxy to EIA with CIA feedback
 router.post('/waypoints/regenerate-one', authMiddleware, async (req, res) => {
   try {
