@@ -197,7 +197,7 @@ router.post('/waypoints/insert', authMiddleware, async (req, res) => {
 
     // 5. Call EIA insert-waypoint
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 45000);
+    const timeout = setTimeout(() => controller.abort(), 240000);
     let eiaData;
     try {
       const eiaRes = await fetch(`${EIA_BASE_URL}/api/agent/insert-waypoint`, {

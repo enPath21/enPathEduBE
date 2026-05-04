@@ -14,5 +14,6 @@ steps:
       - --platform=managed
       - --port=8080
       - --allow-unauthenticated
+      - --timeout=300
 images:
   - 'us-central1-docker.pkg.dev/enpath-app/cloud-run-source-deploy/enpath-edu-be'
