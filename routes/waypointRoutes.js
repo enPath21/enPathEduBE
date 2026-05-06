@@ -128,7 +128,7 @@ router.post('/waypoints/replace-with-suggestion', authMiddleware, async (req, re
 
 // POST /api/education/waypoints/insert — insert a new EIA-generated waypoint between two accepted waypoints
 router.post('/waypoints/insert', authMiddleware, async (req, res) => {
-  const { userId, afterPosition } = req.body;
+  const { userId, afterPosition, credentialTypes, userNotes } = req.body;
   if (!userId || afterPosition == null) {
     return res.status(400).json({ error: 'userId and afterPosition are required' });
   }
@@ -211,6 +211,8 @@ router.post('/waypoints/insert', authMiddleware, async (req, res) => {
           ciaGoals,
           completedEdu,
           allAcceptedWaypoints: accepted,
+          credentialTypes: credentialTypes || [],
+          userNotes: userNotes || '',
         }),
         signal: controller.signal,
       });
