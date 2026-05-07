@@ -26,7 +26,7 @@ const educationWaypointSchema = new mongoose.Schema(
     position: { type: Number },
     status: {
       type: String,
-      enum: ['pending', 'accepted', 'declined', 'replaced'],
+      enum: ['pending', 'accepted', 'declined', 'replaced', 'undesired'],
       default: 'pending',
     },
     replacedById: { type: String },
