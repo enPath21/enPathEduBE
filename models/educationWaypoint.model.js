@@ -35,6 +35,11 @@ const educationWaypointSchema = new mongoose.Schema(
     url: { type: String },
     financialAid: { type: Boolean, default: false },
     tags: [{ type: String }],
+    userStartDate: { type: String },
+    userEndDate: { type: String },
+    isCompleted: { type: Boolean, default: false },
+    matchProbabilityBoost: { type: Number },
+    matchWaypointLabel: { type: String },
   },
   { timestamps: true }
 );
