@@ -68,24 +68,38 @@ router.post('/waypoints/run/:userId', authMiddleware, async (req, res) => {
   }
 });
 
-// PATCH /api/edu/waypoints/:id/feedback — accept forwards to EIA, declined hard-deletes locally
+// PATCH /api/edu/waypoints/:id/feedback — accept, decline (hard delete), or undesired (suggest another)
 router.patch('/waypoints/:id/feedback', authMiddleware, async (req, res) => {
   try {
     const { status, feedback, userId, projectedYear } = req.body;
-    if (!['accepted', 'declined'].includes(status)) {
-      return res.status(400).json({ error: 'status must be accepted or declined' });
+    if (!['accepted', 'declined', 'undesired'].includes(status)) {
+      return res.status(400).json({ error: 'status must be accepted, declined, or undesired' });
     }
     if (!userId) {
       return res.status(400).json({ error: 'userId is required' });
     }
 
+    // 'Not a fit' (declined) → hard delete, no EIA call
     if (status === 'declined') {
-      // Hard delete — "Not a fit" removes the document entirely
-      await EducationWaypoint.findByIdAndDelete(req.params.id);
-      return res.json({ success: true });
+      const id = req.params.id;
+      await EducationWaypoint.findOneAndDelete({ $or: [{ waypointId: id }, { _id: id }] }).catch(() => EducationWaypoint.findOneAndDelete({ waypointId: id }));
+      return res.json({ success: true, deleted: true });
     }
 
-    // Accepted — forward to EIA
+    // 'Suggest another' (undesired) → mark undesired then forward to EIA for replacement
+    if (status === 'undesired') {
+      const id = req.params.id;
+      await EducationWaypoint.findOneAndUpdate(
+        { $or: [{ waypointId: id }, { _id: id }] },
+        { $set: { status: 'undesired' } }
+      ).catch(() => EducationWaypoint.findOneAndUpdate({ waypointId: id }, { $set: { status: 'undesired' } }));
+      const body = { action: 'decline', note: feedback, userId };
+      if (projectedYear != null) body.projectedYear = projectedYear;
+      const data = await patchToEIA(`/api/agent/waypoints/${req.params.id}/feedback`, body);
+      return res.json(data);
+    }
+
+    // 'accepted' → forward to EIA
     const body = { action: 'accept', note: feedback, userId };
     if (projectedYear != null) body.projectedYear = projectedYear;
     const data = await patchToEIA(`/api/agent/waypoints/${req.params.id}/feedback`, body);
@@ -238,22 +252,27 @@ router.post('/waypoints/insert', authMiddleware, async (req, res) => {
 // PATCH /api/edu/waypoints/:id/regenerate — mark as undesired, then proxy to EIA for replacement
 router.patch('/waypoints/:id/regenerate', authMiddleware, async (req, res) => {
   try {
+    const id = req.params.id;
     const { feedback, userId, poll } = req.body;
     if (!userId) return res.status(400).json({ error: 'userId is required' });
 
     // Mark current waypoint as undesired (for EIA pattern learning) — only on first call, not polls
     if (!poll) {
-      await EducationWaypoint.findByIdAndUpdate(req.params.id, { $set: { status: 'undesired' } });
+      await EducationWaypoint.findOneAndUpdate(
+        { $or: [{ waypointId: id }, { _id: id }] },
+        { $set: { status: 'undesired' } }
+      ).catch(() => EducationWaypoint.findOneAndUpdate({ waypointId: id }, { $set: { status: 'undesired' } }));
     }
 
     // Proxy to EIA regenerate-one
     const data = await proxyToEIA('/api/agent/waypoints/regenerate-one', {
       userId,
-      waypointId: req.params.id,
+      waypointId: id,
       feedbackText: feedback || '',
     });
     res.json(data);
   } catch (err) {
+    console.error('[edu:regenerate] error:', err.message);
     res.status(502).json({ error: err.message });
   }
 });
