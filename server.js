@@ -11,6 +11,7 @@ app.use('/api/edu', require('./routes/educationRoutes'));
 app.use('/api/edu', require('./routes/waypointRoutes'));
 app.use('/api/edu/share', require('./routes/shareRoutes'));
 app.use('/api/edu', require('./routes/enrolledRoutes'));
+app.use('/api/edu', require('./routes/agentRoutes'));
 app.use('/api/activity', require('./routes/activityRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/health', require('./routes/healthRoutes'));

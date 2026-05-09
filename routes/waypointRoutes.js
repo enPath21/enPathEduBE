@@ -320,11 +320,11 @@ router.patch('/waypoints/:id/dates', authMiddleware, async (req, res) => {
   }
 
   try {
-    const wp = await EducationWaypoint.findByIdAndUpdate(
-      id,
+    const wp = await EducationWaypoint.findOneAndUpdate(
+      { $or: [{ waypointId: id }, { _id: id }] },
       { $set: update },
       { new: true },
-    );
+    ).catch(() => EducationWaypoint.findOneAndUpdate({ waypointId: id }, { $set: update }, { new: true }));
     if (!wp) return res.status(404).json({ error: 'Waypoint not found' });
     res.json({ success: true, waypoint: wp });
   } catch (err) {
