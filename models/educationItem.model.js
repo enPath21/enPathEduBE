@@ -28,6 +28,7 @@ const educationItemSchema = new mongoose.Schema(
     },
     location: { type: String },
     focusAreas: [{ type: String }],  // chips/tags
+    skillChips: [{ type: String }],   // extracted skill chips from resume or manual entry
     description: { type: String },
     source: { type: String, enum: ['resume', 'manual'], default: 'resume' },
 
