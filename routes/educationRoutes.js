@@ -14,8 +14,8 @@ router.get('/history/:userId', async (req, res) => {
   }
 });
 
-// POST /api/edu/history/:userId — create education item
-router.post('/history/:userId', authMiddleware, async (req, res) => {
+// POST /api/edu/history/:userId — create education item (JWT or internal API key)
+router.post('/history/:userId', apiKeyOrAuth, async (req, res) => {
   try {
     const item = await EducationItem.create({ ...req.body, userId: req.params.userId });
     res.status(201).json(item);
@@ -49,7 +49,7 @@ router.delete('/history/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// POST /api/education/history/from-resume — bulk upsert from resume parser
+// POST /api/education/history/from-resume — wipe existing edu records for user then insert fresh
 router.post('/history/from-resume', apiKeyOrAuth, async (req, res) => {
   try {
     const { userId, items } = req.body;
@@ -57,18 +57,16 @@ router.post('/history/from-resume', apiKeyOrAuth, async (req, res) => {
       return res.status(400).json({ error: 'userId and items[] are required' });
     }
 
+    // Wipe all existing education records for this user — resume replace flow
+    await EducationItem.deleteMany({ userId });
+
     const results = [];
     for (const item of items) {
-      const filter = { userId, institution: item.institution, credentialName: item.credentialName };
-      const doc = await EducationItem.findOneAndUpdate(
-        filter,
-        { ...item, userId, source: 'resume' },
-        { upsert: true, new: true, runValidators: true }
-      );
+      const doc = await EducationItem.create({ ...item, userId, source: 'resume' });
       results.push(doc);
     }
 
-    res.status(200).json({ upserted: results.length, items: results });
+    res.status(200).json({ replaced: results.length, items: results });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
