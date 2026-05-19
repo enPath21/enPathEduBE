@@ -14,6 +14,8 @@ const EduShareCard = mongoose.model('EduShareCard', new mongoose.Schema({
   totalEarningsImpact: { type: Number, default: 0 },
   totalInvestment: { type: Number, default: 0 },
   timePeriod: { type: String, default: '10 Years' },
+  currency: { type: String, default: 'USD' },
+  locale:   { type: String, default: 'en-US' },
   credentialTypes: [String],
   waypoints: { type: mongoose.Schema.Types.Mixed, default: [] },
   expiresAt: { type: Date },
@@ -22,7 +24,7 @@ const EduShareCard = mongoose.model('EduShareCard', new mongoose.Schema({
 // POST /api/edu/share/generate — create share token
 router.post('/generate', authMiddleware, async (req, res) => {
   try {
-    const { userId, shareType, stats, waypoints, timePeriod } = req.body;
+    const { userId, shareType, stats, waypoints, timePeriod, currency, locale } = req.body;
     if (!userId) return res.status(400).json({ error: 'userId required' });
 
     const shareToken = crypto.randomUUID();
@@ -40,6 +42,8 @@ router.post('/generate', authMiddleware, async (req, res) => {
       totalEarningsImpact: stats?.totalEarningsImpact || 0,
       totalInvestment: stats?.totalInvestment || 0,
       timePeriod: timePeriod || '10 Years',
+      currency: currency || 'USD',
+      locale:   locale   || 'en-US',
       credentialTypes: stats?.credentialTypes || [],
       waypoints: (waypoints || []).map(w => ({
         credentialName: w.credentialName,
