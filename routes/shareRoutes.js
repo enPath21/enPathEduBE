@@ -7,6 +7,7 @@ const mongoose = require('../config/mongoose');
 const EduShareCard = mongoose.model('EduShareCard', new mongoose.Schema({
   shareToken: { type: String, required: true, unique: true, index: true },
   userId: { type: String, required: true },
+  username: { type: String, default: '' },
   acceptedCount: { type: Number, default: 0 },
   totalWaypoints: { type: Number, default: 0 },
   peakAnnualRoi: { type: Number, default: 0 },
@@ -32,6 +33,7 @@ router.post('/generate', authMiddleware, async (req, res) => {
     await EduShareCard.create({
       shareToken,
       userId,
+      username: req.body.username || '',
       acceptedCount: stats?.acceptedCount || 0,
       totalWaypoints: stats?.totalWaypoints || 0,
       peakAnnualRoi: stats?.peakAnnualRoi || 0,
