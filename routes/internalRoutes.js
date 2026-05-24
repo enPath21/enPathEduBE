@@ -10,6 +10,8 @@ const router = express.Router();
 const apiKeyOrAuth = require('../middleware/apiKeyOrAuth');
 const EducationItem = require('../models/educationItem.model');
 const EducationWaypoint = require('../models/educationWaypoint.model');
+const EduEnrolledRecord = require('../models/EduEnrolledRecord');
+const AuditLog = require('../models/auditLog.model');
 
 router.get('/internal/summary/:userId', apiKeyOrAuth, async (req, res) => {
   try {
@@ -84,6 +86,62 @@ router.get('/internal/summary/:userId', apiKeyOrAuth, async (req, res) => {
     res.json({ history: historyOut, waypoints: waypointsOut });
   } catch (err) {
     console.error('[edu/internal/summary] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /internal/export/:userId ────────────────────────────────────────────
+// GDPR data export — sanitized, no internal IDs or schema hints
+router.get('/internal/export/:userId', apiKeyOrAuth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const [history, waypoints] = await Promise.all([
+      EducationItem.find({ userId }).sort({ endDate: -1 }).lean(),
+      EducationWaypoint.find({ userId }).sort({ position: 1 }).lean(),
+    ]);
+
+    const completedCredentials = history.map(h => ({
+      credential: h.credentialName || null,
+      institution: h.institution || null,
+      type: h.credentialType || null,
+      status: h.status || null,
+      startDate: h.startDate ? new Date(h.startDate).toISOString().split('T')[0] : null,
+      endDate: h.endDate ? new Date(h.endDate).toISOString().split('T')[0] : null,
+      skills: h.skillChips || [],
+    }));
+
+    const plannedCredentials = waypoints
+      .filter(w => w.status !== 'declined' && w.status !== 'undesired')
+      .map(w => ({
+        credential: w.credentialName || null,
+        institution: w.institution || null,
+        type: w.credentialType || null,
+        projectedYear: w.projectedYear || null,
+        status: w.status || null,
+      }));
+
+    res.json({ completedCredentials, plannedCredentials });
+  } catch (err) {
+    console.error('[edu/internal/export] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── DELETE /internal/delete/:userId ────────────────────────────────────────────
+// GDPR Article 17 — hard-delete all education data for a user
+router.delete('/internal/delete/:userId', apiKeyOrAuth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    await Promise.all([
+      EducationItem.deleteMany({ userId }),
+      EducationWaypoint.deleteMany({ userId }),
+      EduEnrolledRecord.deleteMany({ userId }),
+      AuditLog.deleteMany({ userId }),
+    ]);
+    console.log(`[edu/internal/delete] Deleted all data for user ${userId}`);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[edu/internal/delete] Error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

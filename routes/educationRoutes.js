@@ -27,10 +27,17 @@ router.post('/history/:userId', apiKeyOrAuth, async (req, res) => {
 // PUT /api/education/history/:id — update education item
 router.put('/history/:id', authMiddleware, async (req, res) => {
   try {
-    const item = await EducationItem.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
+    // Strip immutable/system fields that Mongoose rejects on update
+    const { _id, __v, userId, createdAt, updatedAt, ...body } = req.body;
+
+    // Strip empty strings for enum fields — Mongoose rejects "" against a fixed enum.
+    // Omitting the key entirely is safe; Mongoose leaves the existing value in place.
+    const ENUM_FIELDS = ['deliveryMode', 'credentialType', 'status', 'honors', 'source'];
+    for (const field of ENUM_FIELDS) {
+      if (body[field] === '') delete body[field];
+    }
+
+    const item = await EducationItem.findByIdAndUpdate(req.params.id, body, { new: true });
     if (!item) return res.status(404).json({ error: 'Education item not found' });
     res.json(item);
   } catch (err) {

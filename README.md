@@ -1,8 +1,11 @@
 # enPathEduBE
 
-Education module backend for the [enPath](https://enpath.ai) AI career intelligence platform. Manages education history, AI-generated pathway waypoints, provider matches, and share cards.
+Education module backend for the [enPath](https://enpath-frontend-285173621267.us-central1.run.app) AI career intelligence platform. Manages education history, AI-generated pathway waypoints, provider matches, and share cards.
 
 Part of the enPath platform — see [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed route and model documentation.
+
+Cloud Run service: `enpath-edu-be`
+Production: https://enpath-edu-be-285173621267.us-central1.run.app
 
 ## Tech Stack
 
@@ -10,7 +13,22 @@ Part of the enPath platform — see [ARCHITECTURE.md](./ARCHITECTURE.md) for det
 - **Framework:** Express
 - **Database:** MongoDB Atlas (Mongoose ODM)
 - **Infrastructure:** Google Cloud Run, Cloud Build
-- **Auth:** JWT (shared secret with enPathJobsBE)
+- **Auth:** JWT (shared secret with enPathJobsBE) + `x-api-key` for internal routes
+
+## Module Role
+
+enPathEduBE owns all education data for a user:
+
+- **Education history** — degrees, certifications, bootcamps, in-progress credentials
+- **Education waypoints** — AI-generated pathway suggestions (pending/accepted/declined)
+- **Provider matches** — matched education providers for a waypoint
+- **Enrolled records** — tracking of accepted/enrolled items
+- **Share cards** — public education pathway share cards (tokenized, no auth)
+- **Internal summary** — `GET /api/edu/internal/summary/:userId` consumed by Claire for education data context injection
+
+## Pending Card Button Label
+
+Pending education waypoint cards use **"Keep It"** (not "Sounds Good") on the accept button. All buttons are grey.
 
 ## Environment Variables
 
@@ -39,7 +57,9 @@ Health check: `GET /health`
 
 Deploys automatically via Cloud Build on push to `main`. See `cloudbuild.yaml` for the pipeline — builds a Docker image, pushes to Artifact Registry, and deploys to Cloud Run (`enpath-edu-be`).
 
-**Production URL:** `https://enpath-edu-be-285173621267.us-central1.run.app`
+```bash
+python3 /home/user/workspace/enpath-deploy.py edu-be
+```
 
 ## Project Structure
 
@@ -65,4 +85,14 @@ routes/
   activityRoutes.js    # Audit log
   authRoutes.js        # Auth stub
   healthRoutes.js      # Health check
+  internalRoutes.js    # Internal summary for Claire context injection
 ```
+
+## Platform Context
+
+enPathEduBE is one of four module backends. It communicates with:
+
+- **enPathJobsBE** — for auth validation and billing charges
+- **enPathCIA** — for goal preferences and personalization
+- **EIA (Education Intelligence Agent)** — for waypoint generation and recalc
+- **enPathJobsBE (Claire)** — via the internal summary endpoint (`GET /api/edu/internal/summary/:userId`)
