@@ -6,7 +6,7 @@ const educationItemSchema = new mongoose.Schema(
 
     // Core (all types)
     credentialName: { type: String },
-    institution: { type: String, required: true },
+    institution: { type: String },
     credentialType: {
       type: String,
       enum: ['degree', 'certification', 'bootcamp', 'course', 'other'],
