@@ -4,6 +4,30 @@ const EducationItem = require('../models/educationItem.model');
 const authMiddleware = require('../middleware/authMiddleware');
 const apiKeyOrAuth = require('../middleware/apiKeyOrAuth');
 
+// POST /api/edu/history/from-resume — wipe existing edu records for user then insert fresh
+// MUST be defined before POST /history/:userId to prevent Express matching "from-resume" as userId
+router.post('/history/from-resume', apiKeyOrAuth, async (req, res) => {
+  try {
+    const { userId, items } = req.body;
+    if (!userId || !Array.isArray(items)) {
+      return res.status(400).json({ error: 'userId and items[] are required' });
+    }
+
+    // Wipe all existing education records for this user — resume replace flow
+    await EducationItem.deleteMany({ userId });
+
+    const results = [];
+    for (const item of items) {
+      const doc = await EducationItem.create({ ...item, userId, source: 'resume' });
+      results.push(doc);
+    }
+
+    res.status(200).json({ replaced: results.length, items: results });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // GET /api/education/history/:userId — fetch all education items for user
 router.get('/history/:userId', async (req, res) => {
   try {
@@ -53,29 +77,6 @@ router.delete('/history/:id', authMiddleware, async (req, res) => {
     res.json({ message: 'Deleted', id: req.params.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
-  }
-});
-
-// POST /api/education/history/from-resume — wipe existing edu records for user then insert fresh
-router.post('/history/from-resume', apiKeyOrAuth, async (req, res) => {
-  try {
-    const { userId, items } = req.body;
-    if (!userId || !Array.isArray(items)) {
-      return res.status(400).json({ error: 'userId and items[] are required' });
-    }
-
-    // Wipe all existing education records for this user — resume replace flow
-    await EducationItem.deleteMany({ userId });
-
-    const results = [];
-    for (const item of items) {
-      const doc = await EducationItem.create({ ...item, userId, source: 'resume' });
-      results.push(doc);
-    }
-
-    res.status(200).json({ replaced: results.length, items: results });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
   }
 });
 
