@@ -26,6 +26,7 @@ router.post('/generate', authMiddleware, async (req, res) => {
   try {
     const { userId, shareType, stats, waypoints, timePeriod, currency, locale } = req.body;
     if (!userId) return res.status(400).json({ error: 'userId required' });
+    const username = req.user?.username || '';
 
     const shareToken = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
@@ -35,7 +36,7 @@ router.post('/generate', authMiddleware, async (req, res) => {
     await EduShareCard.create({
       shareToken,
       userId,
-      username: req.body.username || '',
+      username,
       acceptedCount: stats?.acceptedCount || 0,
       totalWaypoints: stats?.totalWaypoints || 0,
       peakAnnualRoi: stats?.peakAnnualRoi || 0,
