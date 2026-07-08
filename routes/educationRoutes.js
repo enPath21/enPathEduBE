@@ -130,6 +130,23 @@ router.get('/history/:userId', async (req, res) => {
   try {
     const items = await EducationItem.find({ userId: req.params.userId }).sort({ endDate: -1 });
 
+    // TODO: REMOVE — Deploy 8 diagnostic, added 2026-07-08 for Edu enrichment audit (jimmytwotimes)
+    try {
+      const diagRows = items.map(it => ({
+        name: it.credentialName || null,
+        type: it.credentialType || null,
+        start: it.startDate ? new Date(it.startDate).toISOString().slice(0, 7) : null,
+        end: it.endDate ? new Date(it.endDate).toISOString().slice(0, 7) : null,
+        tuitionMid: (it.tuitionMidpoint === undefined || it.tuitionMidpoint === null) ? null : it.tuitionMidpoint,
+        salPct: (it.salaryImpactPct === undefined || it.salaryImpactPct === null) ? null : it.salaryImpactPct,
+        salRoi: (it.salaryRoiPerYear === undefined || it.salaryRoiPerYear === null) ? null : it.salaryRoiPerYear,
+        enriched: it.enrichedAt ? new Date(it.enrichedAt).toISOString().slice(0, 10) : null,
+      }));
+      console.log('[edu-history-diag] userId=' + req.params.userId + ' count=' + items.length + ' rows=' + JSON.stringify(diagRows));
+    } catch (_diagErr) {
+      // Diagnostic must never break the request
+    }
+
     // Fire-and-forget backfill for unenriched items
     const stale = items.filter(it => !it.enrichedAt && it.credentialName);
     if (stale.length > 0) {
