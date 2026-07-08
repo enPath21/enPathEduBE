@@ -47,6 +47,22 @@ const educationItemSchema = new mongoose.Schema(
     // Certification-specific (on top of core)
     verificationUrl: { type: String },
     renewalRequired: { type: Boolean },
+
+    // ── EIA enrichment (financial fields for chart + KPI cards) ──
+    // All optional. Populated by POST /api/agent/enrich-credential.
+    // Existing rows without these fields render as unenriched until GET lazy-fills.
+    durationMonths: { type: Number },
+    tuitionMin: { type: Number },
+    tuitionMax: { type: Number },
+    tuitionMidpoint: { type: Number },
+    salaryImpactPct: { type: Number },
+    salaryRoiPerYear: { type: Number },
+    enrichmentConfidence: { type: Number },
+    enrichedAt: { type: Date },
+
+    // User overrides — if set, honored over EIA output on re-enrich
+    tuitionOverride: { type: Number },
+    salaryImpactPctOverride: { type: Number },
   },
   { timestamps: true }
 );
