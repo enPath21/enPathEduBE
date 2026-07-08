@@ -65,7 +65,9 @@ function isDegree(item) {
 
 // Reconstruct TYE-year → job/waypoint source mapping.
 // Past jobs cover [startDate.year, endDate.year]. Current job (no endDate) covers
-// [startDate.year, currentYear + phase1Years]. Waypoints cover their projectedYear.
+// [startDate.year, currentYear] AND every future TYE year not owned by a waypoint
+// (JIA extends TYE for the current role forward to retirement). Waypoints own
+// [projectedYear, projectedYear + estimatedTenureYears - 1].
 // Returns { year → { jobRef: {type,id,titleSnapshot} | null } }
 function buildYearToJobMap(jobs, waypoints, currentYear, tyeYears) {
   const map = new Map();
@@ -77,7 +79,10 @@ function buildYearToJobMap(jobs, waypoints, currentYear, tyeYears) {
     return da - db;
   });
 
-  // Past + current jobs
+  // Past + current jobs — cover their explicit year ranges first.
+  // (Current job's future coverage is added below, after waypoints, so waypoints
+  // can claim their tenure block without being overwritten.)
+  const currentJob = sortedJobs.find(j => !j.endDate);
   for (const job of sortedJobs) {
     const startY = pickYear(job.startDate);
     if (!startY) continue;
@@ -92,22 +97,42 @@ function buildYearToJobMap(jobs, waypoints, currentYear, tyeYears) {
     }
   }
 
-  // Waypoints — sorted by projectedYear
+  // Waypoints — sorted by projectedYear. Each waypoint owns
+  // [projectedYear, projectedYear + estimatedTenureYears - 1].
   const sortedWps = [...(waypoints || [])].sort(
     (a, b) => (a.projectedYear || 0) - (b.projectedYear || 0),
   );
-  // Each waypoint owns years [projectedYear, projectedYear + estimatedTenureYears - 1]
   for (const wp of sortedWps) {
     const startY = wp.projectedYear;
     if (!startY) continue;
     const tenure = wp.estimatedTenureYears || 3;
     for (let y = startY; y < startY + tenure; y++) {
-      // Don't overwrite already-mapped past/current jobs
+      // Don't overwrite already-mapped past/current jobs (past history wins)
       if (!map.has(y)) {
         map.set(y, {
           type: 'waypoint',
           id:   String(wp._id || wp.id),
           titleSnapshot: wp.jobTitle || wp.title || 'Future Role',
+        });
+      }
+    }
+  }
+
+  // Extend the current job forward across every TYE year not yet claimed.
+  // This is the fix for "user has no archetype but current job runs to retirement" —
+  // JIA emits TYE entries for the current role in those future years, and those
+  // years should be creditable to any qualifying existing credentials.
+  if (currentJob) {
+    const maxTyeYear = (tyeYears || []).reduce(
+      (max, t) => (t && t.year && t.year > max ? t.year : max),
+      currentYear,
+    );
+    for (let y = currentYear + 1; y <= maxTyeYear; y++) {
+      if (!map.has(y)) {
+        map.set(y, {
+          type: 'current',
+          id:   String(currentJob.id || currentJob._id),
+          titleSnapshot: currentJob.jobTitle || currentJob.title || 'Current Role',
         });
       }
     }
@@ -318,11 +343,16 @@ router.get('/salary-impact/:userId', authMiddleware, async (req, res) => {
       });
     }
 
-    if (!waypoints || waypoints.length === 0) {
+    // Only surface the "no archetype" note when there's also no current job to
+    // project forward from. If the user has a current job (no endDate), JIA
+    // already forecasts future TYE for that role, so future20 is meaningful
+    // without an archetype pathway.
+    const hasCurrentJob = jobs.some(j => !j.endDate);
+    if ((!waypoints || waypoints.length === 0) && !hasCurrentJob) {
       missingData.push({
         code: 'no_archetype_pathway',
         count: null,
-        actionText: 'No archetype pathway set — future capped at current role',
+        actionText: 'No archetype pathway or current job — future estimate limited',
       });
     }
 
